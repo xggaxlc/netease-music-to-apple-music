@@ -72,7 +72,7 @@ const playlistId = url.parse(argv.url, true).query.id;
   const run = async (song) => {
     await page.goto(`https://music.apple.com/cn/search?term=${song.search}`);
     await page.waitForFunction(() => {
-      return !!document.querySelector('.dt-shelf--search-song') || (!!document.querySelector('.search__no-results'));
+      return !!document.querySelector('.search__search-hits') || (!!document.querySelector('.search__no-results'));
     }, {
       timeout: 1 * 60 * 1000
     });
