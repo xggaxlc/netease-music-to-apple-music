@@ -2,7 +2,6 @@ const path = require('path');
 const fs = require('fs-extra');
 const puppeteer = require('puppeteer');
 const _ = require('lodash');
-const { padEnd } = require('lodash');
 const async = require('async');
 const argv = require('minimist')(process.argv.slice(2));
 const url = require('url');
@@ -12,7 +11,9 @@ const playlistId = url.parse(argv.url, true).query.id;
 (async () => {
   const browser = await puppeteer.launch({ headless: false, defaultViewport: { width: 1200, height: 600 } });
   const page = await browser.newPage();
-  await page.goto(`https://music.163.com/#/playlist?id=${playlistId}`);
+  await page.goto(`https://music.163.com/#/playlist?id=${playlistId}`, { timeout: 1 * 60 * 1000, waitUntil: 'networkidle0' });
+  await page.waitForSelector('.m-tophead .link');
+  await page.waitForTimeout(1 * 1000);
   await page.click('.m-tophead .link');
   await page.waitForFunction(() => {
     const aEle = document.body.querySelector('.m-tophead .head a');
@@ -30,7 +31,7 @@ const playlistId = url.parse(argv.url, true).query.id;
   }, {
     timeout: 1 * 60 * 1000
   });
-  const playlist = await page.evaluate(() => {
+  const onlinePlaylist = await page.evaluate(() => {
     const aTrs = document.body.querySelector('iframe').contentDocument.body.querySelectorAll('.n-songtb tbody tr');
     const list = [...aTrs].map(tr => {
       const aTds = tr.querySelectorAll('td');
@@ -53,10 +54,13 @@ const playlistId = url.parse(argv.url, true).query.id;
   if (fs.existsSync(playlistFilepath)) {
     playlistLocal = fs.readJSONSync(playlistFilepath);
   }
+  const playlist = _.unionBy(playlistLocal.concat(onlinePlaylist), item => item.name);
+  fs.writeJSONSync(playlistFilepath, playlist, { spaces: 2 });
 
-  fs.writeJSONSync(playlistFilepath, _.unionBy(playlistLocal.concat(playlist), item => item.name), { spaces: 2 });
-
-  await page.goto('https://music.apple.com/login');
+  await page.goto('https://music.apple.com', { timeout: 2 * 60 * 1000 });
+  // await page.waitForSelector('.web-navigation__auth a');
+  // await page.waitForTimeout(3 * 1000);
+  // await page.click('.web-navigation__auth a');
 
   await page.waitForFunction(() => {
     const aLinks = document.querySelectorAll('.web-navigation__scrollable a');
@@ -94,22 +98,20 @@ const playlistId = url.parse(argv.url, true).query.id;
     }, song);
   }
 
-  await async.eachSeries(playlist, async (song) => {
-    if (!song.processed) {
-      try {
-        console.log(`${song.name}`);
-        await run(song);
-        const index = playlist.findIndex(item => Object.keys(song).every(key => song[key] === item[key]));
-        if (index >= 0) {
-          console.log(`${index + 1} / ${playlist.length}`);
-          playlist[index].processed = true;
-          fs.writeJSONSync(playlistFilepath, playlist, { spaces: 2 });
-        }
-      } catch (e) {
-        console.log(e, song.name);
-      }
+  await async.eachOfSeries(playlist, (song, index, done) => {
+    if (song.processed) {
+      done(null, song);
+      return;
     }
+    console.log(`${song.name}`);
+    run(song)
+      .then(() => {
+        console.log(`${index + 1} / ${playlist.length}`)
+        playlist[index].processed = true;
+        fs.writeJSONSync(playlistFilepath, playlist, { spaces: 2 });
+      })
+      .finally(() => done(null, song));
   });
 
-  // await browser.close();
+  await browser.close();
 })();
