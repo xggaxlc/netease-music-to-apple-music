@@ -54,7 +54,7 @@ const playlistId = url.parse(argv.url, true).query.id;
   if (fs.existsSync(playlistFilepath)) {
     playlistLocal = fs.readJSONSync(playlistFilepath);
   }
-  const playlist = _.unionBy(playlistLocal.concat(onlinePlaylist), item => item.name);
+  const playlist = _.unionBy(playlistLocal.concat(onlinePlaylist), item => item.search);
   fs.writeJSONSync(playlistFilepath, playlist, { spaces: 2 });
 
   await page.goto('https://music.apple.com', { timeout: 2 * 60 * 1000 });
