@@ -1,0 +1,13 @@
+{
+  "name": "netease-music-to-apple-music",
+  "version": "1.0.0",
+  "main": "app.js",
+  "license": "MIT",
+  "dependencies": {
+    "async": "^3.2.0",
+    "fs-extra": "^9.0.1",
+    "lodash": "^4.17.20",
+    "minimist": "^1.2.5",
+    "puppeteer": "^5.5.0"
+  }
+}
